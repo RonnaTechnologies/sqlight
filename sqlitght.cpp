@@ -1,5 +1,7 @@
 #include "sqlight.hpp"
 
+#include <stdexcept>
+
 namespace sqlight
 {
 
@@ -23,7 +25,13 @@ namespace sqlight
 
     auto db::transaction() -> sqlight::transaction
     {
-        return sqlight::transaction{ shared_from_this() };
+        auto db_sptr = weak_from_this().lock();
+        if (!db_sptr)
+        {
+            throw std::runtime_error(
+            "Error: transaction can only be created from a shared_ptr to a database connection.");
+        }
+        return sqlight::transaction{ db_sptr };
     }
 
     transaction::transaction(std::shared_ptr<db> db_) : db_ptr{ db_ }
