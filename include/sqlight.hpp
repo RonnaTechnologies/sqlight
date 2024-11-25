@@ -14,6 +14,10 @@
 
 namespace sqlight
 {
+    static constexpr auto sqlite_version()
+    {
+        return sqlite3_version;
+    }
 
     template <typename... Args>
     class query final
