@@ -11,6 +11,7 @@ namespace sqlight
         if (error != 0)
         {
             sqlite3_close(db_ptr);
+            db_ptr = nullptr;
         }
     }
 
