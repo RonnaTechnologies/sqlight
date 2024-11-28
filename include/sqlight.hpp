@@ -104,8 +104,8 @@ namespace sqlight
     {
 
         sqlite3_stmt* statement = nullptr;
-        sqlite3_prepare_v2(db_ptr, sql_query.get_query_string().data(),
-                           static_cast<int>(sql_query.get_query_string().size()), &statement, nullptr);
+        const auto error = sqlite3_prepare_v2(db_ptr, sql_query.get_query_string().data(),
+                                              static_cast<int>(sql_query.get_query_string().size()), &statement, nullptr);
 
         [&]<auto... Is>(std::index_sequence<Is...>) {
             ((bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is + 1)), ...);
@@ -163,6 +163,10 @@ namespace sqlight
         else if constexpr (std::is_integral_v<Arg_t>)
         {
             sqlite3_bind_int(statement, index, static_cast<int>(arg));
+        }
+        else if constexpr (std::is_same_v<std::string, Arg_t>)
+        {
+            sqlite3_bind_text(statement, index, arg.data(), arg.size(), SQLITE_TRANSIENT);
         }
     }
 

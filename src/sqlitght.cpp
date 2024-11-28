@@ -12,15 +12,12 @@ namespace sqlight
         {
             sqlite3_close(db_ptr);
             db_ptr = nullptr;
+            throw std::runtime_error("Cannot open database.");
         }
     }
 
     db::~db()
     {
-        if (db_ptr == nullptr)
-        {
-            return;
-        }
         sqlite3_close(db_ptr);
     }
 
