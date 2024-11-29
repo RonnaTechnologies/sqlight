@@ -5,6 +5,7 @@
 #include <concepts>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -113,6 +114,11 @@ namespace sqlight
 
         auto step = sqlite3_step(statement);
 
+        if (step == SQLITE_DONE)
+        {
+            return {};
+        }
+
         std::vector<std::tuple<Args...>> results;
 
         while (step == SQLITE_ROW)
@@ -126,6 +132,12 @@ namespace sqlight
             step = sqlite3_step(statement);
         }
 
+        if (step != SQLITE_DONE)
+        {
+            throw std::runtime_error{ sqlite3_errmsg(db_ptr) };
+        }
+
+        sqlite3_reset(statement);
         sqlite3_finalize(statement);
 
         return results;
