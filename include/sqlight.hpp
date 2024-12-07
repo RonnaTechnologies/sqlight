@@ -58,10 +58,10 @@ namespace sqlight
 
         template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
             requires std::same_as<Query_t<QueryArgs...>, query<QueryArgs...>>
-        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(const Query_t<QueryArgs...>& sql_query);
+        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(const Query_t<QueryArgs...>& sql_query) const;
 
         template <typename... Args, typename... QueryArgs>
-        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(std::string_view sql_query, QueryArgs&&... args);
+        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(std::string_view sql_query, QueryArgs&&... args) const;
 
         ~db();
 
@@ -70,7 +70,7 @@ namespace sqlight
         static void bind_param(sqlite3_stmt* statement, T&& arg, int index);
 
         template <typename T>
-        void get_column(sqlite3_stmt* statement, int index, T& value);
+        void get_column(sqlite3_stmt* statement, int index, T& value) const;
 
         sqlite3* db_ptr = nullptr;
     };
@@ -82,11 +82,11 @@ namespace sqlight
 
         template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
             requires std::same_as<Query_t<QueryArgs...>, query<QueryArgs...>>
-        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(const Query_t<QueryArgs...>& sql_query);
+        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(const Query_t<QueryArgs...>& sql_query) const;
 
 
         template <typename... Args, typename... QueryArgs>
-        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(std::string_view sql_query, QueryArgs&&... args);
+        [[maybe_unused]] std::vector<std::tuple<Args...>> execute(std::string_view sql_query, QueryArgs&&... args) const;
 
         void commit();
 
@@ -101,7 +101,7 @@ namespace sqlight
 
     template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
         requires std::same_as<Query_t<QueryArgs...>, query<QueryArgs...>>
-    [[maybe_unused]] std::vector<std::tuple<Args...>> db::execute(const Query_t<QueryArgs...>& sql_query)
+    [[maybe_unused]] std::vector<std::tuple<Args...>> db::execute(const Query_t<QueryArgs...>& sql_query) const
     {
 
         sqlite3_stmt* statement = nullptr;
@@ -145,7 +145,7 @@ namespace sqlight
     }
 
     template <typename... Args, typename... QueryArgs>
-    [[maybe_unused]] std::vector<std::tuple<Args...>> db::execute(std::string_view sql_query, QueryArgs&&... args)
+    [[maybe_unused]] std::vector<std::tuple<Args...>> db::execute(std::string_view sql_query, QueryArgs&&... args) const
     {
         return execute<Args...>(query{ std::string{ sql_query }, args... });
     }
@@ -153,13 +153,13 @@ namespace sqlight
 
     template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
         requires std::same_as<Query_t<QueryArgs...>, query<QueryArgs...>>
-    [[maybe_unused]] std::vector<std::tuple<Args...>> transaction::execute(const Query_t<QueryArgs...>& sql_query)
+    [[maybe_unused]] std::vector<std::tuple<Args...>> transaction::execute(const Query_t<QueryArgs...>& sql_query) const
     {
         return db_ptr->execute<Args...>(sql_query);
     }
 
     template <typename... Args, typename... QueryArgs>
-    [[maybe_unused]] std::vector<std::tuple<Args...>> transaction::execute(std::string_view sql_query, QueryArgs&&... args)
+    [[maybe_unused]] std::vector<std::tuple<Args...>> transaction::execute(std::string_view sql_query, QueryArgs&&... args) const
     {
         return db_ptr->execute<Args...>(query{ std::string{ sql_query }, args... });
     }
@@ -184,7 +184,7 @@ namespace sqlight
     }
 
     template <typename T>
-    void db::get_column(sqlite3_stmt* statement, int index, T& value)
+    void db::get_column(sqlite3_stmt* statement, int index, T& value) const
     {
         if constexpr (std::is_integral_v<T>)
         {

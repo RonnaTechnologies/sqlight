@@ -7,12 +7,11 @@ namespace sqlight
 
     db::db(std::string_view db_file, int flags)
     {
-        const auto error = sqlite3_open_v2(db_file.data(), &db_ptr, flags, nullptr); // TODO: Use v2
+        const auto error = sqlite3_open_v2(db_file.data(), &db_ptr, flags, nullptr);
         if (error != 0)
         {
             sqlite3_close(db_ptr);
             throw std::runtime_error{ sqlite3_errmsg(db_ptr) };
-            // throw std::runtime_error("Cannot open database.");
         }
     }
 
