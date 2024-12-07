@@ -52,7 +52,7 @@ namespace sqlight
         friend class sqlight::transaction;
 
     public:
-        explicit db(std::string_view db_file);
+        explicit db(std::string_view db_file, int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
 
         auto transaction() -> class sqlight::transaction;
 
@@ -108,7 +108,8 @@ namespace sqlight
         const auto error = sqlite3_prepare_v2(db_ptr, sql_query.get_query_string().data(),
                                               static_cast<int>(sql_query.get_query_string().size()), &statement, nullptr);
 
-        [&]<auto... Is>(std::index_sequence<Is...>) {
+        [&]<auto... Is>(std::index_sequence<Is...>)
+        {
             ((bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is + 1)), ...);
         }(std::index_sequence_for<QueryArgs...>{});
 
