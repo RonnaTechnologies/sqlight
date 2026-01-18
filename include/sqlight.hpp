@@ -181,6 +181,10 @@ namespace sqlight
         {
             sqlite3_bind_text(statement, index, arg.data(), arg.size(), SQLITE_TRANSIENT);
         }
+        else if constexpr (std::is_same_v<std::vector<std::uint8_t>, Arg_t>)
+        {
+            sqlite3_bind_blob(statement, index, arg.data(), arg.size(), SQLITE_TRANSIENT);
+        }
     }
 
     template <typename T>
@@ -193,6 +197,13 @@ namespace sqlight
         if constexpr (std::is_same_v<std::string, T>)
         {
             value = std::string{ reinterpret_cast<const char*>(sqlite3_column_text(statement, index)) };
+        }
+        if constexpr (std::is_same_v<std::vector<std::uint8_t>, T>)
+        {
+
+            const auto ptr = reinterpret_cast<const std::uint8_t*>(sqlite3_column_blob(statement, index));
+            const auto length = static_cast<std::size_t>(sqlite3_column_bytes(statement, index));
+            value = std::vector<std::uint8_t>{ ptr, ptr + length };
         }
     }
 
