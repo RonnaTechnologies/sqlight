@@ -5,17 +5,18 @@
 namespace sqlight
 {
 
-    db::db(std::string_view db_file, int flags)
+    db::db(const std::string& db_file, int flags)
     {
         const auto error = sqlite3_open_v2(db_file.data(), &db_ptr, flags, nullptr);
-        if (error != 0)
+        if (error != SQLITE_OK)
         {
+            std::string error_message = db_ptr ? sqlite3_errmsg(db_ptr) : "Failed to open database";
             sqlite3_close(db_ptr);
-            throw std::runtime_error{ sqlite3_errmsg(db_ptr) };
+            throw std::runtime_error{ error_message };
         }
     }
 
-    db::~db()
+    db::~db() noexcept
     {
         sqlite3_close(db_ptr);
     }
@@ -31,14 +32,29 @@ namespace sqlight
         return sqlight::transaction{ db_sptr };
     }
 
-    transaction::transaction(std::shared_ptr<db> db_) : db_ptr{ db_ }
+    transaction::transaction(std::shared_ptr<db> db_) : committed{ false }, db_ptr{ db_ }
     {
         db_ptr->execute("BEGIN TRANSACTION;");
+    }
+
+    transaction::~transaction()
+    {
+        if (!committed)
+        {
+            try
+            {
+                db_ptr->execute("ROLLBACK;");
+            }
+            catch (...)
+            {
+            }
+        }
     }
 
     void transaction::commit()
     {
         db_ptr->execute("COMMIT;");
+        committed = true;
     }
 
 } // namespace sqlight
