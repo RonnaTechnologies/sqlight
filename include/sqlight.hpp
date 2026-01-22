@@ -146,7 +146,6 @@ namespace sqlight
             if (step != SQLITE_DONE)
             {
                 const auto error_message = std::string{ sqlite3_errmsg(db_ptr) };
-                sqlite3_finalize(statement);
                 throw std::runtime_error{ error_message };
             }
 
