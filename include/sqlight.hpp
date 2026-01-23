@@ -103,63 +103,81 @@ namespace sqlight
 
     template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
         requires std::same_as<Query_t<QueryArgs...>, query<QueryArgs...>>
-    [[maybe_unused]] std::vector<std::tuple<Args...>> db::execute(const Query_t<QueryArgs...>& sql_query) const
+    [[maybe_unused]]
+    std::vector<std::tuple<Args...>> db::execute(const Query_t<QueryArgs...>& sql_query) const
     {
+        const std::string& sql = sql_query.get_query_string();
+        const char* tail = sql.c_str();
 
-        sqlite3_stmt* statement = nullptr;
-        const auto error = sqlite3_prepare_v2(db_ptr, sql_query.get_query_string().data(),
-                                              static_cast<int>(sql_query.get_query_string().size()), &statement, nullptr);
+        std::vector<std::tuple<Args...>> results;
 
-        if (error != SQLITE_OK)
+        while (*tail != '\0')
         {
-            const auto error_message = std::string{ sqlite3_errmsg(db_ptr) };
-            sqlite3_finalize(statement);
-            throw std::runtime_error{ error_message };
-        }
-        try
-        {
-            [&]<auto... Is>(std::index_sequence<Is...>)
+            sqlite3_stmt* statement = nullptr;
+
+            const int rc = sqlite3_prepare_v2(db_ptr, tail, -1, &statement, &tail);
+
+            if (rc != SQLITE_OK)
             {
-                ((bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is + 1)), ...);
-            }(std::index_sequence_for<QueryArgs...>{});
+                throw std::runtime_error(sqlite3_errmsg(db_ptr));
+            }
 
-            auto step = sqlite3_step(statement);
+            if (!statement)
+            {
+                continue;
+            }
 
-            if (step == SQLITE_DONE)
+            try
+            {
+                if (*tail == '\0')
+                {
+                    [&]<auto... Is>(std::index_sequence<Is...>)
+                    {
+                        ((bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is + 1)), ...);
+                    }(std::index_sequence_for<QueryArgs...>{});
+                }
+
+                int step = sqlite3_step(statement);
+
+                if (*tail != '\0')
+                {
+                    if (step != SQLITE_DONE)
+                    {
+                        throw std::runtime_error("Intermediate SQL statement returned rows");
+                    }
+
+                    sqlite3_finalize(statement);
+                    continue;
+                }
+
+                while (step == SQLITE_ROW)
+                {
+                    std::tuple<Args...> row{};
+                    [&]<auto... Is>(std::index_sequence<Is...>)
+                    { ((get_column(statement, Is, std::get<Is>(row))), ...); }(std::index_sequence_for<Args...>{});
+
+                    results.emplace_back(std::move(row));
+                    step = sqlite3_step(statement);
+                }
+
+                if (step != SQLITE_DONE)
+                {
+                    throw std::runtime_error(sqlite3_errmsg(db_ptr));
+                }
+
+                sqlite3_reset(statement);
+                sqlite3_finalize(statement);
+            }
+            catch (...)
             {
                 sqlite3_finalize(statement);
-                return {};
+                throw;
             }
-
-            std::vector<std::tuple<Args...>> results;
-
-            while (step == SQLITE_ROW)
-            {
-                auto row = std::tuple<Args...>{};
-                [&]<auto... Is>(std::index_sequence<Is...>)
-                { ((get_column(statement, Is, std::get<Is>(row))), ...); }(std::index_sequence_for<Args...>{});
-
-                results.emplace_back(row);
-                step = sqlite3_step(statement);
-            }
-
-            if (step != SQLITE_DONE)
-            {
-                const auto error_message = std::string{ sqlite3_errmsg(db_ptr) };
-                throw std::runtime_error{ error_message };
-            }
-
-            sqlite3_reset(statement);
-            sqlite3_finalize(statement);
-
-            return results;
         }
-        catch (...)
-        {
-            sqlite3_finalize(statement);
-            throw;
-        }
+
+        return results;
     }
+
 
     template <typename... Args, typename... QueryArgs>
     [[maybe_unused]] std::vector<std::tuple<Args...>> db::execute(std::string_view sql_query, QueryArgs&&... args) const

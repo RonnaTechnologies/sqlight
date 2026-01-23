@@ -5,6 +5,8 @@
 #include <sqlight.hpp>
 
 #include <memory>
+#include <vector>
+
 
 using sqlight::db;
 
@@ -50,10 +52,10 @@ SCENARIO("A database can be created", "[main]")
                 database->execute(R"(CREATE TABLE "test"("id" INTEGER NOT NULL, "name" TEXT NOT NULL, "value" INTEGER NOT NULL);)");
                 AND_THEN("Some data can be inserted into the table")
                 {
-                    database->execute(R"(INSERT INTO "test"("id", "name", "value") VALUES(1, 'test_1', 50);)");
-                    database->execute(R"(INSERT INTO "test"("id", "name", "value") VALUES(2, 'test_2', 50);)");
+                    database->execute(R"(INSERT INTO "test"("id", "name", "value") VALUES(1, 'test_1', 50);
+                                                    INSERT INTO "test"("id", "name", "value") VALUES(2, 'test_2', 50);)");
 
-                    AND_THEN("The table ca be read")
+                    AND_THEN("The table can be read")
                     {
                         const auto records = database->execute<int>(R"(SELECT "id" FROM "test";)");
 
@@ -66,14 +68,15 @@ SCENARIO("A database can be created", "[main]")
 
                             const auto [second] = records.back();
                             REQUIRE(second == 2);
+                            // AND_THEN("A transaction can be created")
+                            // {
+                            //     auto transaction = database->transaction();
+                            //     const auto result = transaction.execute<int>(R"(SELECT "id" FROM "test";)");
+                            //     transaction.commit();
+                            // }
                         }
                     }
                 }
-            }
-
-            THEN("A transaction can be created")
-            {
-                auto transaction = database->transaction();
             }
         }
     }
@@ -88,4 +91,37 @@ SCENARIO("A database can be created", "[main]")
     // transaction.commit();
 
     // REQUIRE(one == 1);
+}
+
+SCENARIO("A blob can be inserted into the DB", "[main]")
+{
+    GIVEN("A in-memory database")
+    {
+
+        AND_GIVEN("A database is created via std::make_shared")
+        {
+            const auto db_file = "file:memdb2?mode=memory&cache=shared";
+            auto database = std::make_shared<db>(db_file);
+
+            AND_GIVEN("A table can be created")
+            {
+                database->execute(R"(CREATE TABLE "test"("id" INTEGER NOT NULL, "name" TEXT NOT NULL, "data" BLOB);)");
+                AND_GIVEN("Some data can be inserted into the table")
+                {
+                    const auto id = 1;
+                    const auto name = std::string{ "test" };
+                    const auto data = std::vector<char>{ 1, 2, 3 };
+
+                    database->execute(R"(INSERT INTO "test" VALUES (:id, :name, :data);)", id, name, data);
+
+                    const auto result = database->execute<int, std::string, std::vector<char>>(R"(SELECT * FROM "test";)");
+
+                    REQUIRE(result.size() == 1U);
+                    REQUIRE(std::get<0>(result.front()) == id);
+                    REQUIRE(std::get<1>(result.front()) == name);
+                    REQUIRE(std::get<2>(result.front()) == data);
+                }
+            }
+        }
+    }
 }
