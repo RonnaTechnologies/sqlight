@@ -1,3 +1,4 @@
+#include <optional>
 #define CATCH_CONFIG_MAIN
 
 #include <catch2/catch.hpp>
@@ -120,6 +121,54 @@ SCENARIO("A blob can be inserted into the DB", "[main]")
                     REQUIRE(std::get<0>(result.front()) == id);
                     REQUIRE(std::get<1>(result.front()) == name);
                     REQUIRE(std::get<2>(result.front()) == data);
+                }
+            }
+        }
+    }
+}
+
+SCENARIO("An optional value can be inserted and retrieved", "[main]")
+{
+    GIVEN("A in-memory database")
+    {
+
+        AND_GIVEN("A database is created via std::make_shared")
+        {
+            const auto db_file = "file:memdb2?mode=memory&cache=shared";
+            auto database = std::make_shared<db>(db_file);
+
+            AND_GIVEN("A table can be created")
+            {
+                database->execute(R"(CREATE TABLE "test"("id" INTEGER NOT NULL, "name" TEXT NULL);)");
+                AND_GIVEN("Some data can be inserted into the table")
+                {
+                    const auto id = 1;
+                    const auto name = std::optional<std::string>{ "test" };
+
+                    database->execute(R"(INSERT INTO "test" VALUES(?, ?))", id, name);
+
+
+                    const auto id2 = 2;
+                    const auto name2 = std::optional<std::string>{ std::nullopt };
+                    database->execute(R"(INSERT INTO "test" VALUES(?, ?))", id2, name2);
+
+                    WHEN("Data is fetched")
+                    {
+                        const auto results =
+                        database->execute<int, std::optional<std::string>>(R"(SELECT "id", "name" FROM "test";)");
+
+                        THEN("Optional results are retrieved correctly")
+                        {
+                            REQUIRE(results.size() == 2U);
+
+                            const auto [first_id, first_name] = results.front();
+                            const auto [second_id, second_name] = results.back();
+
+                            REQUIRE(first_name.has_value());
+                            REQUIRE(first_name.value() == name);
+                            REQUIRE(!second_name.has_value());
+                        }
+                    }
                 }
             }
         }

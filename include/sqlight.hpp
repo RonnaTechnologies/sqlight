@@ -5,6 +5,7 @@
 #include <concepts>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -19,6 +20,10 @@ namespace sqlight
     {
         return sqlite3_version;
     }
+
+    template <typename T>
+    concept Optional = requires { typename T::value_type; } && std::same_as<T, std::optional<typename T::value_type>>;
+
 
     template <typename... Args>
     class query final
@@ -203,8 +208,18 @@ namespace sqlight
     void db::bind_param(sqlite3_stmt* statement, T&& arg, int index)
     {
         using Arg_t = std::remove_cvref_t<T>;
-
-        if constexpr (std::is_same_v<std::int64_t, Arg_t>)
+        if constexpr (Optional<Arg_t>)
+        {
+            if (arg.has_value())
+            {
+                bind_param(statement, *arg, index);
+            }
+            else
+            {
+                sqlite3_bind_null(statement, index);
+            }
+        }
+        else if constexpr (std::is_same_v<std::int64_t, Arg_t>)
         {
             sqlite3_bind_int64(statement, index, static_cast<std::int64_t>(arg));
         }
@@ -225,7 +240,20 @@ namespace sqlight
     template <typename T>
     void db::get_column(sqlite3_stmt* statement, int index, T& value) const
     {
-        if constexpr (std::is_integral_v<T>)
+        if constexpr (Optional<T>)
+        {
+            if (sqlite3_column_type(statement, index) == SQLITE_NULL)
+            {
+                value = std::nullopt;
+            }
+            else
+            {
+                typename T::value_type inner_value;
+                get_column(statement, index, inner_value);
+                value = std::move(inner_value);
+            }
+        }
+        else if constexpr (std::is_integral_v<T>)
         {
             value = sqlite3_column_int(statement, index);
         }
