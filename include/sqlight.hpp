@@ -139,8 +139,8 @@ namespace sqlight
                 [&]<auto... Is>(std::index_sequence<Is...>)
                 {
                     (((Is >= arg_offset && Is < arg_offset + param_count) ?
-                      (bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is - arg_offset + 1), void{}) :
-                      void{}),
+                      (bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is - arg_offset + 1), void()) :
+                      void()),
                      ...);
                 }(std::index_sequence_for<QueryArgs...>{});
 
