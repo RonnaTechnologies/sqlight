@@ -116,8 +116,10 @@ namespace sqlight
         const std::string& sql = sql_query.get_query_string();
         const char* tail = sql.c_str();
         std::vector<std::tuple<Args...>> results;
+        std::size_t arg_offset = 0;
 
-        auto is_tail_empty = [](const char* tail) { return std::ranges::all_of(std::string_view{ tail }, ::isspace); };
+        const auto is_tail_empty = [](const char* tail)
+        { return std::ranges::all_of(std::string_view{ tail }, ::isspace); };
 
         while (!is_tail_empty(tail))
         {
@@ -133,16 +135,20 @@ namespace sqlight
             }
             try
             {
-                const auto is_last_statement = is_tail_empty(tail);
-                if (is_last_statement)
+                const int param_count = sqlite3_bind_parameter_count(statement);
+                [&]<auto... Is>(std::index_sequence<Is...>)
                 {
-                    [&]<auto... Is>(std::index_sequence<Is...>)
-                    {
-                        ((bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is + 1)), ...);
-                    }(std::index_sequence_for<QueryArgs...>{});
-                }
+                    (((Is >= arg_offset && Is < arg_offset + param_count) ?
+                      (bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is - arg_offset + 1), void{}) :
+                      void{}),
+                     ...);
+                }(std::index_sequence_for<QueryArgs...>{});
+
+                arg_offset += param_count;
+
                 int step = sqlite3_step(statement);
-                if (!is_last_statement)
+
+                if (!is_tail_empty(tail))
                 {
                     if (step != SQLITE_DONE)
                     {
