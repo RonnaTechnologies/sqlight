@@ -2,6 +2,7 @@
 
 #include <sqlite3.h>
 
+#include <algorithm>
 #include <concepts>
 #include <cstdint>
 #include <memory>
@@ -106,6 +107,7 @@ namespace sqlight
         std::shared_ptr<db> db_ptr;
     };
 
+
     template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
         requires std::same_as<Query_t<QueryArgs...>, query<QueryArgs...>>
     [[maybe_unused]]
@@ -113,63 +115,54 @@ namespace sqlight
     {
         const std::string& sql = sql_query.get_query_string();
         const char* tail = sql.c_str();
-
         std::vector<std::tuple<Args...>> results;
 
-        while (*tail != '\0')
+        auto is_tail_empty = [](const char* tail) { return std::ranges::all_of(std::string_view{ tail }, ::isspace); };
+
+        while (!is_tail_empty(tail))
         {
             sqlite3_stmt* statement = nullptr;
-
             const int rc = sqlite3_prepare_v2(db_ptr, tail, -1, &statement, &tail);
-
             if (rc != SQLITE_OK)
             {
                 throw std::runtime_error(sqlite3_errmsg(db_ptr));
             }
-
             if (!statement)
             {
                 continue;
             }
-
             try
             {
-                if (*tail == '\0')
+                const auto is_last_statement = is_tail_empty(tail);
+                if (is_last_statement)
                 {
                     [&]<auto... Is>(std::index_sequence<Is...>)
                     {
                         ((bind_param(statement, std::get<Is>(sql_query.get_query_args()), Is + 1)), ...);
                     }(std::index_sequence_for<QueryArgs...>{});
                 }
-
                 int step = sqlite3_step(statement);
-
-                if (*tail != '\0')
+                if (!is_last_statement)
                 {
                     if (step != SQLITE_DONE)
                     {
                         throw std::runtime_error("Intermediate SQL statement returned rows");
                     }
-
                     sqlite3_finalize(statement);
                     continue;
                 }
-
                 while (step == SQLITE_ROW)
                 {
                     std::tuple<Args...> row{};
                     [&]<auto... Is>(std::index_sequence<Is...>)
                     { ((get_column(statement, Is, std::get<Is>(row))), ...); }(std::index_sequence_for<Args...>{});
-
                     results.emplace_back(std::move(row));
                     step = sqlite3_step(statement);
                 }
-
                 if (step != SQLITE_DONE)
                 {
                     throw std::runtime_error(sqlite3_errmsg(db_ptr));
                 }
-
                 sqlite3_reset(statement);
                 sqlite3_finalize(statement);
             }
@@ -179,7 +172,6 @@ namespace sqlight
                 throw;
             }
         }
-
         return results;
     }
 
