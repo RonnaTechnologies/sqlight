@@ -21,7 +21,7 @@ namespace sqlight
         sqlite3_close(db_ptr);
     }
 
-    auto db::transaction() -> sqlight::transaction
+    auto db::transaction(bool auto_commit) -> sqlight::transaction
     {
         auto db_sptr = weak_from_this().lock();
         if (!db_sptr)
@@ -32,13 +32,18 @@ namespace sqlight
         return sqlight::transaction{ db_sptr };
     }
 
-    transaction::transaction(std::shared_ptr<db> db_) : committed{ false }, db_ptr{ db_ }
+    transaction::transaction(std::shared_ptr<db> db_, bool auto_commit)
+    : committed{ false }, auto_commit{ auto_commit }, db_ptr{ db_ }
     {
         db_ptr->execute("BEGIN TRANSACTION;");
     }
 
     transaction::~transaction()
     {
+        if (auto_commit)
+        {
+            commit();
+        }
         if (!committed)
         {
             try

@@ -61,7 +61,7 @@ namespace sqlight
         explicit db(const std::string& db_file, int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
         ~db() noexcept;
 
-        auto transaction() -> class sqlight::transaction;
+        auto transaction(bool auto_commit = false) -> class sqlight::transaction;
 
         template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
             requires std::same_as<Query_t<QueryArgs...>, query<QueryArgs...>>
@@ -84,7 +84,7 @@ namespace sqlight
     class transaction
     {
     public:
-        transaction(std::shared_ptr<db> db_);
+        transaction(std::shared_ptr<db> db_, bool auto_commit = false);
         ~transaction();
 
         template <typename... Args, template <typename...> typename Query_t, typename... QueryArgs>
@@ -104,6 +104,7 @@ namespace sqlight
 
     private:
         bool committed;
+        bool auto_commit{ false };
         std::shared_ptr<db> db_ptr;
     };
 
