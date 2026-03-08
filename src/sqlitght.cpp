@@ -29,7 +29,7 @@ namespace sqlight
             throw std::runtime_error(
             "Error: transaction can only be created from a shared_ptr to a database connection.");
         }
-        return sqlight::transaction{ db_sptr };
+        return sqlight::transaction{ db_sptr, auto_commit };
     }
 
     transaction::transaction(std::shared_ptr<db> db_, bool auto_commit)
