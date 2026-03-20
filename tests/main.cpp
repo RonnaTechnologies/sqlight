@@ -1,3 +1,4 @@
+#include <numeric>
 #include <optional>
 #define CATCH_CONFIG_MAIN
 
@@ -92,6 +93,29 @@ SCENARIO("A database can be created", "[main]")
     // transaction.commit();
 
     // REQUIRE(one == 1);
+}
+
+SCENARIO("Test variadic binding using std::vector")
+{
+    GIVEN("A in-memory database")
+    {
+        const auto* const db_file = "file:memdb2?mode=memory&cache=shared";
+        auto database = std::make_shared<db>(db_file);
+
+        WHEN("A vector is passed to the query")
+        {
+            const auto values = std::vector<std::string>{ "hello", " ", "world!" };
+            const auto result = database->execute<std::string>("SELECT ? || ? || ?;", values);
+
+
+            THEN("The vector values are bound to the query")
+            {
+                REQUIRE(result.size() == 1U);
+                const auto concat = std::accumulate(values.cbegin(), values.cend(), std::string{});
+                REQUIRE(concat == std::get<0>(result.front()));
+            }
+        }
+    }
 }
 
 SCENARIO("A blob can be inserted into the DB", "[main]")

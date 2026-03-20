@@ -25,6 +25,11 @@ namespace sqlight
     template <typename T>
     concept Optional = requires { typename T::value_type; } && std::same_as<T, std::optional<typename T::value_type>>;
 
+    template <typename T>
+    concept Vector = requires {
+        typename T::value_type;
+        typename T::allocator_type;
+    } && std::same_as<T, std::vector<typename T::value_type, typename T::allocator_type>>;
 
     template <typename... Args>
     class query final
@@ -233,6 +238,13 @@ namespace sqlight
         else if constexpr (std::is_same_v<std::vector<char>, Arg_t>)
         {
             sqlite3_bind_blob(statement, index, arg.data(), arg.size(), SQLITE_TRANSIENT);
+        }
+        else if constexpr (Vector<Arg_t> && !std::same_as<Arg_t, std::vector<char>>)
+        {
+            for (auto&& arg_v : arg)
+            {
+                bind_param(statement, arg_v, index++);
+            }
         }
     }
 
